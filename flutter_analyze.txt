@@ -1,0 +1,61 @@
+﻿Analyzing app...                                                
+
+  error - Target of URI doesn't exist: '../../../core/theme/app_colors.dart' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:2:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: '../../../core/theme/app_spacing.dart' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:3:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: '../../../core/theme/app_animations.dart' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:4:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: '../../../core/widgets/marker_highlight.dart' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:5:8 - uri_does_not_exist
+  error - Undefined name 'AppAnimations' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:32:17 - undefined_identifier
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:83:30 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:97:43 - invalid_constant
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:97:43 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:100:40 - invalid_constant
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:100:40 - undefined_identifier
+  error - The name 'MarkerHighlight' isn't a class - lib\features\onboarding\presentation\screens\role_selection_screen.dart:103:23 - creation_with_non_type
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:109:28 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:113:40 - invalid_constant
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:113:40 - undefined_identifier
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:117:32 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:122:40 - invalid_constant
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:122:40 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:148:40 - invalid_constant
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:148:40 - undefined_identifier
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:167:36 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:175:40 - invalid_constant
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:175:40 - undefined_identifier
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:206:24 - undefined_identifier
+  error - Undefined name 'AppAnimations' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:225:17 - undefined_identifier
+  error - Undefined name 'AppAnimations' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:262:21 - undefined_identifier
+  error - Undefined name 'AppAnimations' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:265:23 - undefined_identifier
+  error - Undefined name 'AppRadius' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:269:51 - undefined_identifier
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:273:23 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:310:49 - invalid_constant
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:310:49 - undefined_identifier
+  error - Undefined name 'AppAnimations' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:317:35 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:325:46 - invalid_constant
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:325:46 - undefined_identifier
+  error - The method 'MarkerHighlight' isn't defined for the type '_RoleCardState' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:328:23 - undefined_method
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:337:33 - undefined_identifier
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:338:33 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:342:46 - invalid_constant
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:342:46 - undefined_identifier
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:351:33 - undefined_identifier
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:352:33 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:357:46 - invalid_constant
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:357:46 - undefined_identifier
+  error - Undefined name 'AppAnimations' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:361:35 - undefined_identifier
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:367:33 - undefined_identifier
+  error - Undefined name 'AppRadius' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:369:53 - undefined_identifier
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:379:26 - undefined_identifier
+  error - Undefined name 'AppSpacing' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:380:28 - undefined_identifier
+  error - Undefined name 'AppAnimations' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:383:33 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\presentation\screens\role_selection_screen.dart:394:34 - invalid_constant
+  error - Undefined name 'AppColors' - lib\features\onboarding\presentation\screens\role_selection_screen.dart:394:34 - undefined_identifier
+
+flutter : 50 issues found. (ran in 13.3s)
+In Zeile:1 Zeichen:101
++ ... ogram Files\Android\Android Studio\jbr"; flutter analyze 2>&1 | Out-S ...
++                                              ~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (50 issues found. (ran in 13.3s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
