@@ -4,24 +4,25 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../onboarding/presentation/screens/role_selection_screen.dart';
 import 'package:helpme/core/theme/app_spacing.dart';
 import 'package:helpme/core/theme/app_typography.dart';
-import 'package:helpme/features/jobs/presentation/screens/job_detail_screen.dart'; // Import Detail Screen
+import 'package:helpme/features/jobs/presentation/screens/job_detail_screen.dart';
+import 'package:helpme/features/chat/presentation/screens/chat_screen.dart'; // Import Chat
 
-class CraftsmanHomeScreen extends StatelessWidget {
+class CraftsmanHomeScreen extends StatefulWidget {
   const CraftsmanHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Realtime stream of OPEN jobs
-    final stream = Supabase.instance.client
-        .from('jobs')
-        .stream(primaryKey: ['id'])
-        .eq('status', 'open') // Only show open jobs
-        .order('created_at', ascending: false);
+  State<CraftsmanHomeScreen> createState() => _CraftsmanHomeScreenState();
+}
 
+class _CraftsmanHomeScreenState extends State<CraftsmanHomeScreen> {
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
-        title: const Text('Offene Aufträge ⚡'), // Updated Title
+        title: Text(_currentIndex == 0 ? 'Jobs finden 🔍' : 'Meine Aufträge ✅'),
         backgroundColor: AppColors.bgPrimary,
         foregroundColor: AppColors.textPrimary,
         actions: [
@@ -29,7 +30,7 @@ class CraftsmanHomeScreen extends StatelessWidget {
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await Supabase.instance.client.auth.signOut();
-              if (context.mounted) {
+              if (mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
                   (route) => false,
@@ -39,39 +40,190 @@ class CraftsmanHomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: stream,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Fehler: ${snapshot.error}', style: const TextStyle(color: AppColors.danger)));
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));
-          }
+      body: _currentIndex == 0 ? _buildJobFeed() : _buildMyJobs(),
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: AppColors.bgSurface,
+        selectedItemColor: AppColors.accentPrimary,
+        unselectedItemColor: AppColors.textSecondary,
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.search),
+            label: 'Jobs finden',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.check_circle_outline),
+            label: 'Meine Aufträge',
+          ),
+        ],
+      ),
+    );
+  }
 
-          final jobs = snapshot.data!;
+  // --- TAB 1: FEED ---
+  Widget _buildJobFeed() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: Supabase.instance.client
+          .from('jobs')
+          .stream(primaryKey: ['id']).order('created_at', ascending: false),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final jobs = snapshot.data!;
+        
+        if (jobs.isEmpty) {
+          return const Center(
+            child: Text(
+              'Aktuell keine Jobs verfügbar.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          );
+        }
 
-          if (jobs.isEmpty) {
-            return const Center(
-              child: Text(
-                'Aktuell keine offenen Aufträge.\nTrink einen Kaffee! ☕',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 18),
+        return ListView.separated(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          itemCount: jobs.length,
+          separatorBuilder: (ctx, i) => const SizedBox(height: AppSpacing.md),
+          itemBuilder: (context, index) {
+            final job = jobs[index];
+            return _buildJobCard(context, job);
+          },
+        );
+      },
+    );
+  }
+
+  // --- TAB 2: MY JOBS ---
+  Widget _buildMyJobs() {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+    
+    // We fetch 'job_applications' joined with 'jobs'
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: Supabase.instance.client
+          .from('job_applications')
+          .select('*, jobs(*)')
+          .eq('craftsman_id', userId)
+          .order('created_at', ascending: false),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+           return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Fehler: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
+        }
+        
+        final applications = snapshot.data ?? [];
+
+        if (applications.isEmpty) {
+          return const Center(
+            child: Text(
+              'Du hast noch keine Hilfe angeboten.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          itemCount: applications.length,
+          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+          itemBuilder: (context, index) {
+            final app = applications[index];
+            final job = app['jobs']; // Joined job data
+            final status = app['status'];
+
+            if (job == null) return const SizedBox.shrink();
+
+            return Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.bgSurface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: status == 'accepted' ? AppColors.success : AppColors.bgElevated,
+                  width: status == 'accepted' ? 2 : 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        status == 'accepted' ? 'Im Kontakt 💬' : 'Wartet auf Antwort ⏳',
+                        style: TextStyle(
+                          color: status == 'accepted' ? AppColors.accentPrimary : AppColors.textSecondary,
+
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        '${app['price_offer'] ?? job['budget']} €',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    job['title'] ?? 'Unbekannt',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Deine Nachricht: "${app['message']}"',
+                    style: const TextStyle(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (status == 'accepted') ...[
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          if (job['customer_id'] != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(
+                                  otherUserId: job['customer_id'],
+                                  otherUserName: 'Kunde', // Could fetch name
+                                  applicationId: app['id'],
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Fehler: Keine Kunden-ID gefunden! 🛑')),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.chat_bubble_outline),
+                        label: const Text('Kunden kontaktieren'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            itemCount: jobs.length,
-            separatorBuilder: (ctx, i) => const SizedBox(height: AppSpacing.md),
-            itemBuilder: (context, index) {
-              final job = jobs[index];
-              return _buildJobCard(context, job);
-            },
-          );
-        },
-      ),
+          },
+        );
+      },
     );
   }
 
@@ -80,8 +232,7 @@ class CraftsmanHomeScreen extends StatelessWidget {
     final category = job['category'] ?? 'Sonstiges';
     final location = job['location'] ?? 'Kein Ort';
     final budget = job['budget'] ?? 'VB';
-    // Simple date formatting could be added here
-
+    
     IconData catIcon = Icons.work;
     if (category == 'Maler') catIcon = Icons.format_paint;
     if (category == 'Elektrik') catIcon = Icons.bolt;

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
+import 'package:helpme/core/theme/app_spacing.dart'; // Fixed import
+import 'package:helpme/features/chat/presentation/screens/chat_screen.dart'; // Import Chat
 
 class CustomerJobDetailScreen extends StatefulWidget {
   final Map<String, dynamic> job;
@@ -23,12 +24,9 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
           .update({'status': 'accepted'})
           .eq('id', applicationId);
       
-      // Optional: Close job concurrently or update its status?
-      // await Supabase.instance.client.from('jobs').update({'status': 'assigned'}).eq('id', widget.job['id']);
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Angebot angenommen! 🎉')),
+          const SnackBar(content: Text('Kontakt hergestellt! 🎉')),
         );
       }
     } catch (e) {
@@ -42,10 +40,16 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
     }
   }
 
-  void _startChat(String craftsmanId) {
-    // Navigate to Chat Screen or create conversation
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Chat Funktion folgt bald! 💬')),
+  void _startChat(String craftsmanId, String applicationId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          otherUserId: craftsmanId, 
+          otherUserName: 'Handwerker', 
+          applicationId: applicationId,
+        ),
+      ),
     );
   }
 
@@ -128,9 +132,6 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
                   .stream(primaryKey: ['id'])
                   .eq('job_id', jobId)
                   .order('created_at', ascending: false),
-                  // Note: Joining profiles is tricky in realtime stream directly without select.
-                  // For realtime joined data, we fetch profiles separately or rely on simple fetch.
-                  // Let's use FutureBuilder inside ListView item to fetch Profile name for each ID.
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(child: Text('Fehler: ${snapshot.error}'));
@@ -183,7 +184,7 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
         final name = profile != null 
             ? '${profile['first_name'] ?? ''} ${profile['last_name'] ?? ''}'.trim()
             : 'Lädt...';
-        final company = profile?['company_name']; // Optional company name
+        final company = profile?['company_name'];
 
         return Container(
           padding: const EdgeInsets.all(AppSpacing.lg),
@@ -192,7 +193,7 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: status == 'accepted' 
-                  ? AppColors.success 
+                  ? AppColors.accentPrimary 
                   : AppColors.bgElevated,
               width: status == 'accepted' ? 2 : 1,
             ),
@@ -256,48 +257,56 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
 
               // Actions
               if (status == 'accepted')
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Angebot angenommen ✅',
-                      style: TextStyle(
-                        color: AppColors.success,
-                        fontWeight: FontWeight.bold,
+                Column(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentPrimary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Im Kontakt 💬',
+                          style: TextStyle(
+                            color: AppColors.accentPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                )
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => _startChat(craftsmanId),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        // ERROR: _startChat expects 2 args now. 'application' variable is available in scope?
+                        // Yes, _buildApplicationCard(Map<String, dynamic> application)
+                        onPressed: () => _startChat(craftsmanId, application['id']), 
+                        icon: const Icon(Icons.chat_bubble_outline),
+                        label: const Text('Zum Chat'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.textPrimary,
                           side: const BorderSide(color: AppColors.textSecondary),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        child: const Text('Chat'),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : () => _acceptOffer(application['id']),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.success,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Annehmen'),
                       ),
                     ),
                   ],
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : () => _acceptOffer(application['id']),
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    label: const Text('Kontakt aufnehmen'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accentPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
                 ),
             ],
           ),
