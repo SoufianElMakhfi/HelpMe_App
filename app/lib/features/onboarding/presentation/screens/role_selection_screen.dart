@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:helpme/core/theme/app_colors.dart';
-import 'package:helpme/core/theme/app_spacing.dart';
-import 'package:helpme/core/theme/app_animations.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_animations.dart'; // Import Animations
+import '../../../../features/auth/presentation/screens/auth_screen.dart'; // Import AuthScreen
 
 /// Onboarding Screen – Rollenauswahl
 /// Bold & Clean Design – Inspiriert von modernem App-UI
@@ -69,28 +70,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
   void _onRoleSelected(String role) {
     setState(() => _selectedRole = role);
 
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              role == 'customer'
-                  ? '✓ Weiterleitung zum Kunden-Dashboard...'
-                  : '✓ Weiterleitung zum Handwerker-Dashboard...',
-              style: const TextStyle(
-                color: AppColors.textInverse,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            backgroundColor: AppColors.accentPrimary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-          ),
-        );
-      }
-    });
+
   }
 
   @override
@@ -123,6 +103,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       imagePath: 'assets/images/customer_character.png',
                       accentColor: AppColors.accentPrimary,
                       tag: 'Kunde',
+                      roleId: 'customer',
                       isSelected: _selectedRole == 'customer',
                       isOtherSelected: _selectedRole == 'craftsman',
                       onTap: () => _onRoleSelected('customer'),
@@ -142,6 +123,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       imagePath: 'assets/images/craftsman_character.png',
                       accentColor: AppColors.accentSecondary,
                       tag: 'Handwerker',
+                      roleId: 'craftsman',
                       isSelected: _selectedRole == 'craftsman',
                       isOtherSelected: _selectedRole == 'customer',
                       onTap: () => _onRoleSelected('craftsman'),
@@ -152,29 +134,61 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                 const SizedBox(height: AppSpacing.xl),
 
                 // ── Footer ─────────────────────────────────
-                Center(
-                  child: Text.rich(
-                    TextSpan(
-                      text: 'Bereits registriert? ',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: 'Anmelden',
-                          style: TextStyle(
-                            color: AppColors.accentPrimary,
-                            fontWeight: FontWeight.w700,
-                            decoration: TextDecoration.underline,
-                            decorationColor: AppColors.accentPrimary.withValues(alpha: 0.4),
-                          ),
+                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.lg),
+
+                // ── Next Button (visible only when selected) ──
+                AnimatedOpacity(
+                  opacity: _selectedRole != null ? 1.0 : 0.0,
+                  duration: AppAnimations.normal,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _selectedRole != null
+                          ? () {
+                              Navigator.of(context).push(
+                                PageRouteBuilder(
+                                  transitionDuration: const Duration(milliseconds: 600),
+                                  reverseTransitionDuration: const Duration(milliseconds: 600),
+                                  pageBuilder: (context, animation, secondaryAnimation) {
+                                    return FadeTransition(
+                                      opacity: animation,
+                                      child: AuthScreen(
+                                        roleId: _selectedRole!,
+                                        accentColor: _selectedRole == 'customer'
+                                            ? AppColors.accentPrimary
+                                            : AppColors.accentSecondary,
+                                        imagePath: _selectedRole == 'customer'
+                                            ? 'assets/images/customer_character.png'
+                                            : 'assets/images/craftsman_character.png',
+                                        roleLabel: _selectedRole == 'customer'
+                                            ? 'Kunde'
+                                            : 'Handwerker',
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            }
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _selectedRole == 'customer' 
+                            ? AppColors.accentPrimary 
+                            : (_selectedRole == 'craftsman' 
+                                ? AppColors.accentSecondary 
+                                : AppColors.bgSurface),
+                        foregroundColor: AppColors.textInverse,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
                         ),
-                      ],
+                      ),
+                      child: const Text('Weiter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     ),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                
+                const SizedBox(height: AppSpacing.xl),
               ],
             ),
           ),
@@ -250,6 +264,7 @@ class _RoleCard extends StatefulWidget {
   final String imagePath; // 3D Character image
   final Color accentColor;
   final String tag;
+  final String roleId; // Add roleId field
   final bool isSelected;
   final bool isOtherSelected;
   final VoidCallback onTap;
@@ -261,6 +276,7 @@ class _RoleCard extends StatefulWidget {
     required this.imagePath,
     required this.accentColor,
     required this.tag,
+    required this.roleId, // Add roleId
     required this.isSelected,
     required this.isOtherSelected,
     required this.onTap,
@@ -311,155 +327,174 @@ class _RoleCardState extends State<_RoleCard>
         child: AnimatedOpacity(
           duration: AppAnimations.normal,
           opacity: widget.isOtherSelected ? 0.4 : 1.0,
-          child: AnimatedContainer(
-            duration: AppAnimations.normal,
-            curve: Curves.easeInOut,
-            decoration: BoxDecoration(
-              color: widget.isSelected
-                  ? widget.accentColor
-                  : AppColors.bgElevated,
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-            ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             child: Stack(
               children: [
-                // Content
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Tag + Emoji row
-                      Row(
-                        children: [
-                          // Tag pill
-                          AnimatedContainer(
-                            duration: AppAnimations.normal,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: widget.isSelected
-                                  ? Colors.black.withValues(alpha: 0.15)
-                                  : widget.accentColor.withValues(alpha: 0.15),
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.full),
-                            ),
-                            child: Text(
-                              widget.tag,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: widget.isSelected
-                                    ? AppColors.textInverse
-                                    : widget.accentColor,
-                              ),
-                            ),
+                // 1. Background (Hero)
+              Positioned.fill(
+                child: Hero(
+                  tag: 'hero_bg_${widget.roleId}',
+                  flightShuttleBuilder: (
+                    flightContext,
+                    animation,
+                    flightDirection,
+                    fromHeroContext,
+                    toHeroContext,
+                  ) {
+                    return Container(
+                      color: widget.accentColor,
+                    );
+                  },
+                  child: AnimatedContainer(
+                    duration: AppAnimations.normal,
+                    curve: Curves.easeInOut,
+                    decoration: BoxDecoration(
+                      color: widget.isSelected
+                          ? widget.accentColor
+                          : AppColors.bgElevated,
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 2. Content
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Tag + Emoji row
+                    Row(
+                      children: [
+                        AnimatedContainer(
+                          duration: AppAnimations.normal,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 6,
                           ),
-                        ],
-                      ),
-
-                      const Spacer(),
-
-                      // Title
-                      Text(
-                        widget.title,
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: 'Outfit',
-                          color: widget.isSelected
-                              ? AppColors.textInverse
-                              : AppColors.textPrimary,
-                          height: 1.15,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-
-                      const SizedBox(height: AppSpacing.xs),
-
-                      // Subtitle
-                      Text(
-                        widget.subtitle,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: widget.isSelected
-                              ? AppColors.textInverse.withValues(alpha: 0.7)
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-
-                      const SizedBox(height: AppSpacing.md),
-
-                      // CTA Row
-                      Row(
-                        children: [
-                          AnimatedContainer(
-                            duration: AppAnimations.normal,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
+                          decoration: BoxDecoration(
+                            color: widget.isSelected
+                                ? Colors.black.withValues(alpha: 0.15)
+                                : widget.accentColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                          ),
+                          child: Text(
+                            widget.tag,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                               color: widget.isSelected
                                   ? AppColors.textInverse
                                   : widget.accentColor,
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.full),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  widget.isSelected
-                                      ? 'Ausgewählt'
-                                      : 'Auswählen',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: widget.isSelected
-                                        ? widget.accentColor
-                                        : AppColors.textInverse,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(
-                                  widget.isSelected
-                                      ? Icons.check_rounded
-                                      : Icons.arrow_forward_rounded,
-                                  size: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const Spacer(),
+
+                    // Title
+                    Text(
+                      widget.title,
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'Outfit',
+                        color: widget.isSelected
+                            ? AppColors.textInverse
+                            : AppColors.textPrimary,
+                        height: 1.15,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+
+                    const SizedBox(height: AppSpacing.xs),
+
+                    // Subtitle
+                    Text(
+                      widget.subtitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: widget.isSelected
+                            ? AppColors.textInverse.withValues(alpha: 0.7)
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+
+                    const SizedBox(height: AppSpacing.md),
+
+                    // CTA Row
+                    Row(
+                      children: [
+                        AnimatedContainer(
+                          duration: AppAnimations.normal,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: widget.isSelected
+                                ? AppColors.textInverse
+                                : widget.accentColor,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                widget.isSelected ? 'Ausgewählt' : 'Auswählen',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
                                   color: widget.isSelected
                                       ? widget.accentColor
                                       : AppColors.textInverse,
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(width: 6),
+                              Icon(
+                                widget.isSelected
+                                    ? Icons.check_rounded
+                                    : Icons.arrow_forward_rounded,
+                                size: 16,
+                                color: widget.isSelected
+                                    ? widget.accentColor
+                                    : AppColors.textInverse,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
+              ),
 
-                // Character Image (right side)
-                Positioned(
-                  right: -80,
-                  bottom: -20,
+              // 3. Character Image (Hero)
+              Positioned(
+                right: -150,
+                bottom: -250,
+                child: Hero(
+                  tag: 'hero_img_${widget.roleId}',
                   child: AnimatedScale(
                     scale: widget.isSelected ? 1.05 : 1.0,
                     duration: AppAnimations.normal,
                     child: Image.asset(
                       widget.imagePath,
-                      height: 320,
+                      height: 490,
                       fit: BoxFit.contain,
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+              ),
+            ],
+          ), // Stack
+        ), // ClipRRect
+        ), // AnimatedOpacity
+      ), // AnimatedBuilder
+    ); // GestureDetector
   }
 }
