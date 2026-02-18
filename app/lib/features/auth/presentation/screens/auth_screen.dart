@@ -167,181 +167,189 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final imageHeight = screenHeight * 0.35; // Image takes 35% of screen height
+    // Clamp image height to reasonable limits
+    final effectiveImageHeight = imageHeight.clamp(200.0, 500.0);
+
     return Scaffold(
       // We use transparent background because the Hero container will provide the color
       backgroundColor: widget.accentColor,
       body: Stack(
         children: [
           // 1. Hero Background Layer
-          // This expands from the card in the previous screen
           Positioned.fill(
             child: Hero(
               tag: 'hero_bg_${widget.roleId}',
               child: Container(
-                color: widget.accentColor,
+                decoration: BoxDecoration(
+                  color: widget.accentColor, 
+                ),
               ),
             ),
           ),
 
-          // 2. Hero Image
-          // Flies from the card to top-right
-          // 2. Character Image (Centered, No Hero Animation)
+          // 2. Character Image (Centered, Responsive)
           Positioned(
-            top: 50,
+            top: 60, // Fixed top (SafeArea could be better, but this is fine for now)
             left: 0,
             right: 0,
-            child: Image.asset(
-              widget.imagePath,
-              height: 280, // Bigger image
-              fit: BoxFit.contain,
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 500), // Max width for desktop
+                child: Image.asset(
+                  widget.imagePath,
+                  height: effectiveImageHeight, 
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
           ),
 
-          // 3. Content (Fade in)
-          SafeArea(
+          // 3. Content Layer (Scrollable)
+          Positioned.fill(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: AppSpacing.md), // Top padding
-                  
-                  // Back Button (Styled)
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: AppColors.textInverse,
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: Icon(Icons.arrow_back_ios_new, color: widget.accentColor, size: 20),
-                      onPressed: () => Navigator.pop(context),
-                      padding: const EdgeInsets.all(12),
-                      constraints: const BoxConstraints(),
-                    ),
-                  ),
-
-                  // Spacer for centered image
-                  // Image is at top, taking ~380 height + 60 top padding = 440.
-                  // But Title is overlaying/underneath?
-                  // We want Title below image? Or Title above image?
-                  // User said "Welcome text tiefer und größer".
-                  // Let's put Title below image.
-                  const SizedBox(height: 240),
-
-                  // Title (Top Left)
-                  Text(
-                    'Willkommen,\n${widget.roleLabel}!',
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      fontSize: 48, // Bigger font size
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textInverse,
-                      height: 1,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.lg), // Normal spacing to Google button 
-
-                  // Google Button (Social First)
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        // TODO: Google Login
-                      },
-                      icon: const FaIcon(FontAwesomeIcons.google, size: 20),
-                      label: const Text('Mit Google fortfahren'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textInverse,
-                        side: BorderSide(color: AppColors.textInverse.withValues(alpha: 0.3)),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.lg),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: screenHeight, // Ensure full height scroll
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // A. Back Button (Top Left)
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.md),
+                        child: _buildBackButton(context),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: AppSpacing.lg),
+                    // B. Spacer based on Image Height
+                    // We want text to start BELOW the image.
+                    SizedBox(height: effectiveImageHeight - 20), // -20 overlap slightly or tune
 
-                  // Divider (ODER)
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: AppColors.textInverse.withValues(alpha: 0.3))),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                        child: Text(
-                          'ODER',
-                          style: TextStyle(
-                            color: AppColors.textInverse.withValues(alpha: 0.5),
-                            fontSize: 12,
+                    // Title (Top Left)
+                    Text(
+                      'Willkommen,\n${widget.roleLabel}!',
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: (screenHeight < 700) ? 32 : 40, // Smaller font on small screens
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textInverse,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg), // Space to Google Button
+
+                    // Google Sign-In Button (Black)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          // TODO: Google Sign-In Logic
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Google Login kommt bald! 🚧')),
+                          );
+                        },
+                        icon: const FaIcon(FontAwesomeIcons.google, color: Colors.white),
+                        label: const Text('Mit Google fortfahren'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.textInverse, // Black
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(50), 
+                            side: const BorderSide(color: Colors.white12),
+                          ),
+                          elevation: 0,
                         ),
                       ),
-                      Expanded(child: Divider(color: AppColors.textInverse.withValues(alpha: 0.3))),
-                    ],
-                  ),
+                    ),
 
-                  const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.xl),
 
-                  // Toggle Login/Register Tabs
-                  Row(
-                    children: [
-                      _buildAuthTab('Anmelden', _isLogin),
-                      const SizedBox(width: AppSpacing.lg),
-                      _buildAuthTab('Registrieren', !_isLogin),
-                    ],
-                  ),
-
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // Form Fields
-                  _buildTextField('E-Mail Adresse', Icons.email_outlined, controller: _emailController),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildTextField('Passwort', Icons.lock_outline, isPassword: true, controller: _passwordController),
-
-                  const SizedBox(height: AppSpacing.lg), // Space instead of Spacer
-
-                  // Submit Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _submitAuth, // Bind logic
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.textInverse,
-                        foregroundColor: widget.accentColor,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.lg),
-                        ),
-                      ),
-                      child: _isLoading 
-                        ? SizedBox(
-                            width: 24, 
-                            height: 24, 
-                            child: CircularProgressIndicator(
-                              color: widget.accentColor, 
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : Text(
-                            _isLogin ? 'Anmelden' : 'Registrieren',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                    // Divider "ODER"
+                    Row(
+                      children: [
+                        Expanded(child: Divider(color: AppColors.textInverse.withValues(alpha: 0.2))),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                          child: Text(
+                            'ODER',
+                            style: TextStyle(
+                              color: AppColors.textInverse.withValues(alpha: 0.5),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
+                        ),
+                        Expanded(child: Divider(color: AppColors.textInverse.withValues(alpha: 0.2))),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg), // Bottom padding
-                ],
+
+                    const SizedBox(height: AppSpacing.lg),
+                    
+                    // Tab Switcher
+                    _buildAuthTab(),
+
+                    const SizedBox(height: AppSpacing.xl),
+
+                    // Input Form
+                    if (_isLogin) ...[
+                      _buildTextField('E-Mail Adresse', Icons.email_outlined, controller: _emailController),
+                      const SizedBox(height: AppSpacing.md),
+                      _buildTextField('Passwort', Icons.lock_outline, isPassword: true, controller: _passwordController),
+                      const SizedBox(height: AppSpacing.xl),
+                      
+                      // Login Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _submitAuth,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.textInverse,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: _isLoading 
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text('Anmelden'),
+                        ),
+                      ),
+                    ] else ...[
+                      _buildTextField('E-Mail Adresse', Icons.email_outlined, controller: _emailController),
+                      const SizedBox(height: AppSpacing.md),
+                      _buildTextField('Passwort', Icons.lock_outline, isPassword: true, controller: _passwordController),
+                      const SizedBox(height: AppSpacing.md),
+                       // Register Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _submitAuth,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.textInverse,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: _isLoading 
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text('Kostenlos Registrieren'),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: AppSpacing.xxl), 
+                  ],
+                ),
               ),
             ),
           ),
@@ -350,9 +358,34 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _buildAuthTab(String text, bool isActive) {
+  Widget _buildBackButton(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.textInverse,
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(Icons.arrow_back_ios_new, color: widget.accentColor, size: 20),
+        onPressed: () => Navigator.pop(context),
+        padding: const EdgeInsets.all(12),
+        constraints: const BoxConstraints(),
+      ),
+    );
+  }
+
+  Widget _buildAuthTab() {
+    return Row(
+      children: [
+        _buildTabItem('Anmelden', _isLogin, () => setState(() => _isLogin = true)),
+        const SizedBox(width: AppSpacing.lg),
+        _buildTabItem('Registrieren', !_isLogin, () => setState(() => _isLogin = false)),
+      ],
+    );
+  }
+
+  Widget _buildTabItem(String text, bool isActive, VoidCallback onTap) {
     return GestureDetector(
-      onTap: () => setState(() => _isLogin = text == 'Anmelden'),
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -360,16 +393,17 @@ class _AuthScreenState extends State<AuthScreen> {
             text,
             style: TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: isActive ? AppColors.textInverse : AppColors.textInverse.withOpacity(0.5),
+              fontWeight: FontWeight.bold,
+              color: isActive ? AppColors.textInverse : AppColors.textInverse.withValues(alpha: 0.4),
             ),
           ),
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            height: 3,
-            width: 24,
-            color: isActive ? AppColors.textInverse : Colors.transparent,
-          ),
+          const SizedBox(height: 4),
+          if (isActive)
+            Container(
+              height: 3,
+              width: 24,
+              color: AppColors.textInverse,
+            ),
         ],
       ),
     );

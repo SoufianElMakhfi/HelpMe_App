@@ -332,169 +332,170 @@ class _RoleCardState extends State<_RoleCard>
             child: Stack(
               children: [
                 // 1. Background (Hero)
-              Positioned.fill(
-                child: Hero(
-                  tag: 'hero_bg_${widget.roleId}',
-                  flightShuttleBuilder: (
-                    flightContext,
-                    animation,
-                    flightDirection,
-                    fromHeroContext,
-                    toHeroContext,
-                  ) {
-                    return Container(
-                      color: widget.accentColor,
-                    );
-                  },
-                  child: AnimatedContainer(
-                    duration: AppAnimations.normal,
-                    curve: Curves.easeInOut,
-                    decoration: BoxDecoration(
-                      color: widget.isSelected
-                          ? widget.accentColor
-                          : AppColors.bgElevated,
-                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                Positioned.fill(
+                  child: Hero(
+                    tag: 'hero_bg_${widget.roleId}',
+                    flightShuttleBuilder: (
+                      flightContext,
+                      animation,
+                      flightDirection,
+                      fromHeroContext,
+                      toHeroContext,
+                    ) {
+                      return Container(
+                        color: widget.accentColor,
+                      );
+                    },
+                    child: AnimatedContainer(
+                      duration: AppAnimations.normal,
+                      curve: Curves.easeInOut,
+                      decoration: BoxDecoration(
+                        color: widget.isSelected
+                            ? widget.accentColor
+                            : AppColors.bgElevated,
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              // 2. Content
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Tag + Emoji row
-                    Row(
-                      children: [
-                        AnimatedContainer(
-                          duration: AppAnimations.normal,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 6,
+                // 2. Content
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Tag + Emoji row
+                      Row(
+                        children: [
+                          AnimatedContainer(
+                            duration: AppAnimations.normal,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: widget.isSelected
+                                  ? Colors.black.withOpacity(0.15)
+                                  : widget.accentColor.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(AppRadius.full),
+                            ),
+                            child: Text(
+                              widget.tag,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: widget.isSelected
+                                    ? AppColors.textInverse
+                                    : widget.accentColor,
+                              ),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: widget.isSelected
-                                ? Colors.black.withValues(alpha: 0.15)
-                                : widget.accentColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppRadius.full),
-                          ),
-                          child: Text(
-                            widget.tag,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                        ],
+                      ),
+
+                      const Spacer(),
+
+                      // Title
+                      Text(
+                        widget.title,
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Outfit',
+                          color: widget.isSelected
+                              ? AppColors.textInverse
+                              : AppColors.textPrimary,
+                          height: 1.15,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+
+                      const SizedBox(height: AppSpacing.xs),
+
+                      // Subtitle
+                      Text(
+                        widget.subtitle,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: widget.isSelected
+                              ? AppColors.textInverse.withOpacity(0.7)
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+
+                      const SizedBox(height: AppSpacing.md),
+
+                      // CTA Row
+                      Row(
+                        children: [
+                          AnimatedContainer(
+                            duration: AppAnimations.normal,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
                               color: widget.isSelected
                                   ? AppColors.textInverse
                                   : widget.accentColor,
+                              borderRadius: BorderRadius.circular(AppRadius.full),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const Spacer(),
-
-                    // Title
-                    Text(
-                      widget.title,
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        fontFamily: 'Outfit',
-                        color: widget.isSelected
-                            ? AppColors.textInverse
-                            : AppColors.textPrimary,
-                        height: 1.15,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-
-                    const SizedBox(height: AppSpacing.xs),
-
-                    // Subtitle
-                    Text(
-                      widget.subtitle,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: widget.isSelected
-                            ? AppColors.textInverse.withValues(alpha: 0.7)
-                            : AppColors.textSecondary,
-                      ),
-                    ),
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    // CTA Row
-                    Row(
-                      children: [
-                        AnimatedContainer(
-                          duration: AppAnimations.normal,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: widget.isSelected
-                                ? AppColors.textInverse
-                                : widget.accentColor,
-                            borderRadius: BorderRadius.circular(AppRadius.full),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                widget.isSelected ? 'Ausgewählt' : 'Auswählen',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  widget.isSelected ? 'Ausgewählt' : 'Auswählen',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: widget.isSelected
+                                        ? widget.accentColor
+                                        : AppColors.textInverse,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(
+                                  widget.isSelected
+                                      ? Icons.check_rounded
+                                      : Icons.arrow_forward_rounded,
+                                  size: 16,
                                   color: widget.isSelected
                                       ? widget.accentColor
                                       : AppColors.textInverse,
                                 ),
-                              ),
-                              const SizedBox(width: 6),
-                              Icon(
-                                widget.isSelected
-                                    ? Icons.check_rounded
-                                    : Icons.arrow_forward_rounded,
-                                size: 16,
-                                color: widget.isSelected
-                                    ? widget.accentColor
-                                    : AppColors.textInverse,
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-              // 3. Character Image (Hero)
-              Positioned(
-                right: -150,
-                bottom: -250,
-                child: Hero(
-                  tag: 'hero_img_${widget.roleId}',
-                  child: AnimatedScale(
-                    scale: widget.isSelected ? 1.05 : 1.0,
-                    duration: AppAnimations.normal,
-                    child: Image.asset(
-                      widget.imagePath,
-                      height: 490,
-                      fit: BoxFit.contain,
+                // 3. Character Image (Hero)
+                Positioned(
+                  right: -150,
+                  bottom: -250,
+                  child: Hero(
+                    tag: 'hero_img_${widget.roleId}',
+                    child: AnimatedScale(
+                      scale: widget.isSelected ? 1.05 : 1.0,
+                      duration: AppAnimations.normal,
+                      child: Image.asset(
+                        widget.imagePath,
+                        height: 490,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ), // Stack
-        ), // ClipRRect
-        ), // AnimatedOpacity
-      ), // AnimatedBuilder
-    ); // GestureDetector
+              ],
+            ), 
+          ), 
+        ), 
+      ), 
+    ); 
   }
 }
+
