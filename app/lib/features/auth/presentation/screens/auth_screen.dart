@@ -8,6 +8,8 @@ import '../../../../core/theme/app_animations.dart';
 import 'package:helpme/features/dashboard/presentation/screens/customer_home_screen.dart';
 import 'package:helpme/features/dashboard/presentation/screens/craftsman_home_screen.dart';
 import 'package:helpme/features/profile/presentation/screens/profile_setup_screen.dart'; // Import ProfileSetup
+import 'package:google_sign_in/google_sign_in.dart' show GoogleSignIn; // Explicit Import
+import 'package:flutter/foundation.dart'; // Check kIsWeb
 
 class AuthScreen extends StatefulWidget {
   final String roleId;
@@ -40,6 +42,68 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
+  Future<void> _googleSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      // WEB: Use Supabase OAuth direct flow (Standard & Reliable)
+      if (kIsWeb) {
+        await Supabase.instance.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: kIsWeb ? 'http://localhost:3000' : null, // Callback URL we set up
+          scopes: 'email profile openid',
+        );
+        // Note: On Web, this triggers a redirect. The app will reload.
+        return; 
+      }
+
+      // MOBILE (Android/iOS): Use Google Sign-In Plugin (Native Experience)
+      const webClientId = '894854190451-2vd61l8er7po9gqr6h34dudcc3ag9g17.apps.googleusercontent.com'; 
+      const iosClientId = '894854190451-2vd61l8er7po9gqr6h34dudcc3ag9g17.apps.googleusercontent.com';
+
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        clientId: iosClientId,
+        serverClientId: webClientId, // Android needs Web Client ID
+        scopes: ['email', 'profile', 'openid'],
+      );
+      
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+         setState(() => _isLoading = false);
+         return; // User cancelled
+      }
+      
+      final googleAuth = await googleUser.authentication;
+      final accessToken = googleAuth.accessToken;
+      final idToken = googleAuth.idToken;
+
+      if (accessToken == null) {
+        throw 'No Access Token found.';
+      }
+      if (idToken == null) {
+        throw 'No ID Token found.';
+      }
+
+      await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      if (mounted) {
+        await _redirectUser();
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google Sign-In Fehler: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _redirectUser() async {
     if (!mounted) return;
     
@@ -47,49 +111,71 @@ class _AuthScreenState extends State<AuthScreen> {
     if (userId == null) return;
 
     try {
+      // Use maybeSingle() to handle cases where profile doesn't exist yet gracefully
       final data = await Supabase.instance.client
           .from('profiles')
-          .select() // Select ALL fields to check completeness
+          .select() 
           .eq('id', userId)
-          .single();
+          .maybeSingle();
       
-      final role = data['role'] as String?;
-      final street = data['street'] as String?;
-      final phone = data['phone'] as String?;
+      if (!mounted) return;
+
+      // Default role if nothing found (e.g. new user)
+      String effectiveRole = widget.roleId; 
       
-      if (mounted) {
-        // Build Profile Setup Route
-        if (role == null) {
-           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Fehler: Keine Rolle im Profil gefunden.')),
+      if (data != null) {
+          final dbRole = data['role'] as String?;
+          final street = data['street'] as String?;
+          
+          // 1. Check Role Mismatch
+          if (dbRole != null && dbRole != widget.roleId) {
+            final actualRoleLabel = (dbRole == 'craftsman') ? 'Handwerker' : 'Kunde';
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Info: Sie sind bereits als $actualRoleLabel registriert.'),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+            effectiveRole = dbRole;
+          } else if (dbRole != null) {
+            effectiveRole = dbRole;
+          }
+
+          // 2. Check Profile Completeness (simplified)
+          bool isProfileComplete = (street != null && street.isNotEmpty);
+
+          if (!isProfileComplete) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => ProfileSetupScreen(role: effectiveRole)),
+                (route) => false,
+              );
+              return;
+          }
+      } else {
+         // No profile data -> Go to Setup with intended role
+         Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => ProfileSetupScreen(role: effectiveRole)),
+            (route) => false,
           );
           return;
-        }
-
-        // Check completeness
-        bool isProfileComplete = (street != null && street.isNotEmpty) && (phone != null && phone.isNotEmpty);
-
-        if (!isProfileComplete) {
-            // Redirect to Setup
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => ProfileSetupScreen(role: role)),
-              (route) => false,
-            );
-        } else {
-            // Redirect to Dashboard
-            if (role == 'customer') {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const CustomerHomeScreen()),
-                (route) => false,
-              );
-            } else if (role == 'craftsman') {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const CraftsmanHomeScreen()),
-                (route) => false,
-              );
-            }
-        }
       }
+
+      // 3. Redirect to Dashboard
+      if (effectiveRole == 'customer') {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const CustomerHomeScreen()),
+          (route) => false,
+        );
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const CraftsmanHomeScreen()),
+          (route) => false,
+        );
+      }
+
     } catch (e) {
       debugPrint('Error fetching role: $e');
        if (mounted) {
@@ -240,59 +326,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         height: 1.1,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.lg), // Space to Google Button
 
-                    // Google Sign-In Button (Black)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // TODO: Google Sign-In Logic
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Google Login kommt bald! 🚧')),
-                          );
-                        },
-                        icon: const FaIcon(FontAwesomeIcons.google, color: Colors.white),
-                        label: const Text('Mit Google fortfahren'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.textInverse, // Black
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(50), 
-                            side: const BorderSide(color: Colors.white12),
-                          ),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: AppSpacing.xl),
-
-                    // Divider "ODER"
-                    Row(
-                      children: [
-                        Expanded(child: Divider(color: AppColors.textInverse.withValues(alpha: 0.2))),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                          child: Text(
-                            'ODER',
-                            style: TextStyle(
-                              color: AppColors.textInverse.withValues(alpha: 0.5),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        Expanded(child: Divider(color: AppColors.textInverse.withValues(alpha: 0.2))),
-                      ],
-                    ),
-
-                    const SizedBox(height: AppSpacing.lg),
                     
                     // Tab Switcher
                     _buildAuthTab(),
@@ -346,6 +380,39 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                     ],
+
+
+                    const SizedBox(height: AppSpacing.xl),
+                    
+                    // Divider "Oder"
+                    Row(
+                      children: [
+                        const Expanded(child: Divider(color: AppColors.textSecondary)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                          child: Text('ODER', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary)),
+                        ),
+                        const Expanded(child: Divider(color: AppColors.textSecondary)),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+
+                    // Google Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _googleSignIn,
+                        icon: const FaIcon(FontAwesomeIcons.google, color: Colors.red),
+                        label: const Text('Weiter mit Google'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textInverse,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          side: const BorderSide(color: AppColors.textSecondary),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
 
                     const SizedBox(height: AppSpacing.xxl), 
                   ],
