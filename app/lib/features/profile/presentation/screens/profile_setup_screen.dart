@@ -534,7 +534,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           const SizedBox(height: 16),
 
           _buildTextField('Telefonnummer', _phoneController, icon: Icons.phone_outlined, isNumber: true, accentColor: accentColor),
-          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 12, bottom: 16),
+            child: Row(
+              children: [
+                Icon(Icons.lock_outline, size: 12, color: Colors.white.withValues(alpha: 0.5)),
+                const SizedBox(width: 6),
+                Text(
+                  'Nur für die interne Abwicklung sichtbar.',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
 
           if (!isCustomer) ...[
             _buildTextField('Firmenname (Optional)', _companyController, icon: Icons.business, required: false, accentColor: accentColor),
