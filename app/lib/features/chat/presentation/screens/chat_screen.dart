@@ -128,19 +128,24 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           // Messages List
           Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: Supabase.instance.client
-                  .from('messages')
-                  .stream(primaryKey: ['id'])
-                  .order('created_at', ascending: false) // Newest at bottom (reversed list)
-                  .map((messages) => messages.where((msg) {
-                        // Filter messages between these two users
-                        // (Ideally filter server-side with RLS + specific query, but stream filters limited)
-                        final sender = msg['sender_id'];
-                        final receiver = msg['receiver_id'];
-                        return (sender == myId && receiver == widget.otherUserId) ||
-                               (sender == widget.otherUserId && receiver == myId);
-                      }).toList()),
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                stream: widget.applicationId != null 
+                    ? Supabase.instance.client
+                        .from('messages')
+                        .stream(primaryKey: ['id'])
+                        .eq('application_id', widget.applicationId!) // Filter by application ID (Conversation)
+                        .order('created_at', ascending: false) // Newest first (index 0) because list is reversed
+                    : Supabase.instance.client
+                        .from('messages')
+                        .stream(primaryKey: ['id'])
+                        .order('created_at', ascending: false)
+                        .map((messages) => messages.where((msg) {
+                              final sender = msg['sender_id'];
+                              final receiver = msg['receiver_id'];
+                              final myId = Supabase.instance.client.auth.currentUser?.id;
+                              return (sender == myId && receiver == widget.otherUserId) ||
+                                     (sender == widget.otherUserId && receiver == myId);
+                            }).toList()),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(child: Text('Fehler: ${snapshot.error}'));

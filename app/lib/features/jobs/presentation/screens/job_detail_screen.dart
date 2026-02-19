@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../chat/presentation/screens/chat_screen.dart'; // Import Chat Screen
 
 class JobDetailScreen extends StatefulWidget {
   final Map<String, dynamic> job;
@@ -15,6 +16,7 @@ class JobDetailScreen extends StatefulWidget {
 class _JobDetailScreenState extends State<JobDetailScreen> {
   bool _isLoading = false;
   bool _hasApplied = false;
+  String? _applicationId;
 
   @override
   void initState() {
@@ -38,11 +40,35 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           .maybeSingle();
 
       if (response != null && mounted) {
-        setState(() => _hasApplied = true);
+        setState(() {
+          _hasApplied = true;
+          _applicationId = response['id'];
+        });
       }
     } catch (e) {
       // Table might not exist yet, ignore error for now
     }
+  }
+
+  void _openChat() {
+    final customerId = widget.job['customer_id'];
+    if (customerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kunden-ID nicht gefunden')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          otherUserId: customerId,
+          otherUserName: 'Kunde', 
+          applicationId: _applicationId,
+        ),
+      ),
+    );
   }
 
   Future<void> _submitOffer(String message, String price) async {
@@ -340,15 +366,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           width: double.infinity,
           child: FloatingActionButton.extended(
             onPressed: () {
-               if (_hasApplied) return;
+               if (_hasApplied) {
+                 _openChat();
+                 return;
+               }
                _showOfferDialog();
             },
-            backgroundColor: _hasApplied ? Colors.grey : AppColors.accentSecondary,
-            foregroundColor: _hasApplied ? Colors.white : Colors.black,
+            backgroundColor: _hasApplied ? AppColors.accentPrimary : AppColors.accentSecondary,
+            foregroundColor: Colors.black, // Dark text for contrast
             elevation: 8,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            label: Text(_hasApplied ? 'Angebot gesendet ✅' : 'Angebot machen', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            icon: Icon(_hasApplied ? Icons.check : Icons.send_rounded),
+            label: Text(_hasApplied ? 'Zum Chat 💬' : 'Angebot machen', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            icon: Icon(_hasApplied ? Icons.chat_bubble_outline : Icons.send_rounded),
           ),
         ),
       ),

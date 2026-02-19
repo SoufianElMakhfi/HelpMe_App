@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_typography.dart'; // Added this import
 import '../../../onboarding/presentation/screens/role_selection_screen.dart';
 import '../../../jobs/presentation/screens/create_job_screen.dart';
 import '../../../jobs/presentation/screens/customer_job_detail_screen.dart'; 
@@ -354,8 +355,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
     return GestureDetector(
       onTap: () {
-         // Navigate to detail
-         // Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerJobDetailScreen(jobId: job['id'])));
+         Navigator.push(
+           context, 
+           MaterialPageRoute(builder: (_) => CustomerJobDetailScreen(job: job)),
+         );
       },
       child: Container(
         padding: const EdgeInsets.all(20),

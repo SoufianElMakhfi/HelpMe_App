@@ -210,35 +210,94 @@ class _CraftsmanHomeScreenState extends State<CraftsmanHomeScreen> {
   }
 
   Widget _buildMyJobsFeed() {
-    // Placeholder for "My Jobs" logic (requires assignment logic)
-    // For now, let's show jobs where craftsman_id matches (if we had that column)
-    return Center(
-      child: Text(
-        'Du hast noch keine Aufträge angenommen.',
-        style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-      ),
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return const SizedBox.shrink();
+
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: Supabase.instance.client
+          .from('job_applications')
+          .select('*, jobs(*)') // Fetch application AND the related job data
+          .eq('craftsman_id', userId)
+          .order('created_at', ascending: false)
+          .asStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+           return const Center(child: CircularProgressIndicator(color: AppColors.accentSecondary));
+        }
+        if (snapshot.hasError) {
+           return Center(child: Text('Fehler: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
+        }
+        
+        final applications = snapshot.data ?? [];
+        
+        if (applications.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.folder_open_outlined, size: 64, color: Colors.white.withValues(alpha: 0.2)),
+                const SizedBox(height: 16),
+                Text(
+                  'Du hast dich noch auf keine Jobs beworben.',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          itemCount: applications.length,
+          separatorBuilder: (ctx, i) => const SizedBox(height: 16),
+          itemBuilder: (context, index) {
+            // Extract the nested 'jobs' object
+            final application = applications[index];
+            final job = application['jobs'] as Map<String, dynamic>?;
+            
+            if (job == null) return const SizedBox.shrink(); // Should not happen
+
+            // We use the same card design but maybe add a status badge from the application
+            return _buildJobCard(job, applicationStatus: application['status']);
+          },
+        );
+      },
     );
   }
 
-  Widget _buildJobCard(Map<String, dynamic> job) {
+  Widget _buildJobCard(Map<String, dynamic> job, {String? applicationStatus}) {
     // Extract Data
     final title = job['title'] ?? 'Unbekannt';
     final category = job['category'] ?? 'Allgemein';
     final city = job['city'] ?? 'Unbekannt';
-    // final status = job['status'];
     final urgency = job['urgency'] ?? 'normal';
     final images = job['images'] as List<dynamic>?;
     final hasImage = images != null && images.isNotEmpty;
-
-    // Urgency Color/Icon
-    Color urgencyColor = Colors.orangeAccent;
-    String urgencyText = 'Wichtig';
-    if (urgency == 'emergency') {
-      urgencyColor = Colors.redAccent;
-      urgencyText = 'Notfall';
-    } else if (urgency == 'flexible') {
-      urgencyColor = Colors.greenAccent;
-      urgencyText = 'Flexibel';
+    
+    // Status Logic
+    Color statusColor = Colors.orangeAccent;
+    String statusText = 'Wichtig';
+    if (applicationStatus != null) {
+      if (applicationStatus == 'accepted') {
+        statusColor = Colors.greenAccent;
+        statusText = 'Angenommen';
+      } else if (applicationStatus == 'pending') {
+         statusColor = Colors.blueAccent;
+        statusText = 'Beworben';
+      } else {
+        statusColor = Colors.redAccent;
+        statusText = 'Abgelehnt';
+      }
+    } else {
+        // Fallback to urgency if not showing application status
+        final urgency = job['urgency'] ?? 'normal';
+        if (urgency == 'emergency') {
+          statusColor = Colors.redAccent;
+          statusText = 'Notfall'; // ...
+        } else if (urgency == 'flexible') {
+          statusColor = Colors.greenAccent;
+          statusText = 'Flexibel';
+        }
     }
 
     return GestureDetector(
@@ -286,13 +345,13 @@ class _CraftsmanHomeScreenState extends State<CraftsmanHomeScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: urgencyColor.withValues(alpha: 0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: urgencyColor.withValues(alpha: 0.5), width: 0.5),
+                        border: Border.all(color: statusColor.withValues(alpha: 0.5), width: 0.5),
                       ),
                       child: Text(
-                        urgencyText.toUpperCase(),
-                        style: TextStyle(color: urgencyColor, fontSize: 10, fontWeight: FontWeight.bold),
+                        statusText.toUpperCase(),
+                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
                       ),
                     ),
                     
