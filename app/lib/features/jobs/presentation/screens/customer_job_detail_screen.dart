@@ -262,6 +262,7 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
     final price = app['price_offer'];
     final applicationId = app['id']; // Needed for unread check
     final craftsmanId = app['craftsman_id'];
+    final status = app['status'] ?? 'pending'; // Default to pending
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -354,30 +355,178 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
           // Actions
           Row(
             children: [
-               Expanded(
-                 child: OutlinedButton(
-                   onPressed: () {
-                      // Reject logic (optional)
-                   },
-                   style: OutlinedButton.styleFrom(foregroundColor: Colors.white54, side: BorderSide(color: Colors.white12)),
-                   child: const Text('Ablehnen'),
-                 ),
-               ),
-               const SizedBox(width: 12),
-               Expanded(
-                 child: ElevatedButton(
-                   onPressed: () => _startChat(craftsmanId, name, app['id']),
-                   style: ElevatedButton.styleFrom(
-                     backgroundColor: AppColors.accentPrimary,
-                     foregroundColor: Colors.black,
-                   ),
-                   child: const Text('Chatten'),
-                 ),
-               ),
+              // Chat Button
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatScreen(
+                          otherUserId: craftsmanId,
+                          otherUserName: name,
+                          applicationId: applicationId,
+                        ),
+                      ),
+                    ).then((_) => setState(() {})); // Refresh on return
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    side: const BorderSide(color: AppColors.textSecondary),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Chat'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              
+              // Action Button (Accept or Complete)
+              Expanded(
+                child: status == 'accepted' 
+                ? ElevatedButton(
+                    onPressed: () => _showReviewDialog(craftsmanId, applicationId),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.greenAccent,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Abschließen'),
+                  )
+                : ElevatedButton(
+                    onPressed: status == 'pending' ? () => _acceptOffer(applicationId) : null, // Assuming _acceptOffer exists or we need to add it
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accentPrimary,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      disabledBackgroundColor: Colors.grey.withOpacity(0.3),
+                    ),
+                    child: Text(status == 'pending' ? 'Annehmen' : (status == 'declined' ? 'Abgelehnt' : 'Status: $status')),
+                  ),
+              ),
             ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _acceptOffer(String applicationId) async {
+    try {
+      // 1. Mark this application as ACCEPTED
+      await Supabase.instance.client
+          .from('job_applications')
+          .update({'status': 'accepted'})
+          .eq('id', applicationId);
+          
+      // 2. Mark database job as 'assigned' or similar? Optional.
+      // For now, we keep job 'open' or mark it 'in_progress'
+      // Maybe we want to decline all others? For MVP, we allow multiple accepts or just one.
+      
+      setState(() {
+        // Optimistic update
+        final index = _applications.indexWhere((app) => app['id'] == applicationId);
+        if (index != -1) {
+          _applications[index]['status'] = 'accepted';
+        }
+      });
+      
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler: $e')));
+    }
+  }
+
+  Future<void> _showReviewDialog(String craftsmanId, String applicationId) async {
+    final commentController = TextEditingController();
+    int rating = 5;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: AppColors.bgElevated,
+          title: const Text('Auftrag abschließen & Bewerten', style: TextStyle(color: AppColors.textPrimary)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Wie war die Arbeit?', style: TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  return IconButton(
+                    onPressed: () => setState(() => rating = index + 1),
+                    icon: Icon(
+                      index < rating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 32,
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: commentController,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  hintText: 'Kommentar (optional)',
+                  hintStyle: TextStyle(color: AppColors.textSecondary),
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen', style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context); // Close dialog
+                await _completeJobAndReview(craftsmanId, applicationId, rating, commentController.text);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentPrimary, foregroundColor: Colors.black),
+              child: const Text('Fertig'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _completeJobAndReview(String craftsmanId, String applicationId, int rating, String comment) async {
+    try {
+      final myId = Supabase.instance.client.auth.currentUser!.id;
+      final jobId = widget.job['id'];
+
+      // 1. Create Review
+      await Supabase.instance.client.from('reviews').insert({
+        'job_id': jobId,
+        'reviewer_id': myId,
+        'reviewee_id': craftsmanId,
+        'rating': rating,
+        'comment': comment,
+      });
+
+      // 2. Mark Job as Completed
+      await Supabase.instance.client
+          .from('jobs')
+          .update({'status': 'completed'})
+          .eq('id', jobId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vielen Dank! Auftrag abgeschlossen. 🎉')),
+        );
+        Navigator.pop(context); // Go back to Home
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler beim Abschließen: $e')),
+        );
+      }
+    }
   }
 }
