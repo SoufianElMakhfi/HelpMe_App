@@ -4,8 +4,12 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../onboarding/presentation/screens/role_selection_screen.dart';
 
 import 'package:helpme/features/jobs/presentation/screens/create_job_screen.dart'; // Import CreateJob
-import 'package:helpme/features/jobs/presentation/screens/customer_job_detail_screen.dart'; // Import Detail Screen
-import 'package:helpme/core/theme/app_spacing.dart';
+import 'package:helpme/core/theme/app_typography.dart';
+import 'package:helpme/features/jobs/presentation/screens/customer_job_detail_screen.dart'; // RESTORED
+import 'package:helpme/features/jobs/presentation/screens/job_detail_screen.dart';
+import 'package:helpme/features/chat/presentation/screens/chat_screen.dart'; 
+import 'package:helpme/features/profile/presentation/screens/profile_setup_screen.dart'; // Import Profile
+import 'package:helpme/core/theme/app_spacing.dart'; // RESTORED
 
 class CustomerHomeScreen extends StatelessWidget {
   const CustomerHomeScreen({super.key});
@@ -21,6 +25,15 @@ class CustomerHomeScreen extends StatelessWidget {
         backgroundColor: AppColors.bgPrimary,
         foregroundColor: AppColors.textPrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+               Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileSetupScreen(role: 'customer')), // Pass role
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {

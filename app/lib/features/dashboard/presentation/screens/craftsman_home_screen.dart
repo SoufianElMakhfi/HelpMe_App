@@ -5,7 +5,8 @@ import '../../../onboarding/presentation/screens/role_selection_screen.dart';
 import 'package:helpme/core/theme/app_spacing.dart';
 import 'package:helpme/core/theme/app_typography.dart';
 import 'package:helpme/features/jobs/presentation/screens/job_detail_screen.dart';
-import 'package:helpme/features/chat/presentation/screens/chat_screen.dart'; // Import Chat
+import 'package:helpme/features/chat/presentation/screens/chat_screen.dart'; 
+import 'package:helpme/features/profile/presentation/screens/profile_setup_screen.dart'; // Import Profile
 
 class CraftsmanHomeScreen extends StatefulWidget {
   const CraftsmanHomeScreen({super.key});
@@ -26,6 +27,15 @@ class _CraftsmanHomeScreenState extends State<CraftsmanHomeScreen> {
         backgroundColor: AppColors.bgPrimary,
         foregroundColor: AppColors.textPrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+               Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileSetupScreen(role: 'craftsman')), // Pass role
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {

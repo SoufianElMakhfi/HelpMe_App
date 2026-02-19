@@ -185,6 +185,7 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
             ? '${profile['first_name'] ?? ''} ${profile['last_name'] ?? ''}'.trim()
             : 'Lädt...';
         final company = profile?['company_name'];
+        final avatarUrl = profile?['avatar_url'];
 
         return Container(
           padding: const EdgeInsets.all(AppSpacing.lg),
@@ -201,30 +202,45 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header: Name & Price
+              // Header: Avatar, Name & Price
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        company != null && company.isNotEmpty ? company : name,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor: AppColors.bgElevated,
+                          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                          child: avatarUrl == null ? const Icon(Icons.person, color: AppColors.textSecondary) : null,
                         ),
-                      ),
-                      if (company != null && company.isNotEmpty)
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                company != null && company.isNotEmpty ? company : name,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              if (company != null && company.isNotEmpty)
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                    ],
+                      ],
+                    ),
                   ),
                   if (priceOffer != null)
                   Container(

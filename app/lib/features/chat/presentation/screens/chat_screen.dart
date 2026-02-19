@@ -23,6 +23,31 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSending = false;
+  Map<String, dynamic>? _otherUserProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchOtherUserProfile();
+  }
+
+  Future<void> _fetchOtherUserProfile() async {
+    try {
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select()
+          .eq('id', widget.otherUserId)
+          .single();
+      
+      if (mounted) {
+        setState(() {
+          _otherUserProfile = profile;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching profile: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -70,11 +95,32 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final myId = Supabase.instance.client.auth.currentUser!.id;
+    final otherName = _otherUserProfile?['full_name'] ?? _otherUserProfile?['company_name'] ?? widget.otherUserName ?? 'Chat';
+    final otherAvatarUrl = _otherUserProfile?['avatar_url'];
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
-        title: Text(widget.otherUserName ?? 'Chat'),
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: AppColors.bgElevated,
+              backgroundImage: otherAvatarUrl != null ? NetworkImage(otherAvatarUrl) : null,
+              child: otherAvatarUrl == null 
+                  ? const Icon(Icons.person, color: AppColors.textSecondary) 
+                  : null,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                otherName,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        ),
         backgroundColor: AppColors.bgPrimary,
         foregroundColor: AppColors.textPrimary,
       ),
@@ -131,7 +177,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemBuilder: (context, index) {
                     final msg = messages[index];
                     final isMe = msg['sender_id'] == myId;
-                    return _buildMessageBubble(msg['content'], isMe);
+                    return _buildMessageBubble(msg['content'], isMe, otherAvatarUrl);
                   },
                 );
               },
@@ -181,26 +227,43 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(String text, bool isMe) {
+  Widget _buildMessageBubble(String text, bool isMe, String? otherAvatarUrl) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isMe ? AppColors.accentPrimary : AppColors.bgElevated,
-          borderRadius: BorderRadius.circular(18).copyWith(
-            bottomRight: isMe ? Radius.zero : const Radius.circular(18),
-            bottomLeft: !isMe ? Radius.zero : const Radius.circular(18),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) ...[
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: AppColors.bgElevated,
+              backgroundImage: otherAvatarUrl != null ? NetworkImage(otherAvatarUrl) : null,
+              child: otherAvatarUrl == null ? const Icon(Icons.person, size: 14, color: AppColors.textSecondary) : null,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: isMe ? AppColors.accentPrimary : AppColors.bgElevated,
+                borderRadius: BorderRadius.circular(18).copyWith(
+                  bottomRight: isMe ? Radius.zero : const Radius.circular(18),
+                  bottomLeft: !isMe ? Radius.zero : const Radius.circular(18),
+                ),
+              ),
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: isMe ? AppColors.textInverse : AppColors.textPrimary,
+                  fontSize: 16,
+                ),
+              ),
+            ),
           ),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: isMe ? AppColors.textInverse : AppColors.textPrimary,
-            fontSize: 16,
-          ),
-        ),
+        ],
       ),
     );
   }

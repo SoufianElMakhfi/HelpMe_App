@@ -1,9 +1,10 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_typography.dart';
-import '../../../../core/theme/app_animations.dart';
 import '../../../dashboard/presentation/screens/customer_home_screen.dart';
 import '../../../dashboard/presentation/screens/craftsman_home_screen.dart';
 
@@ -30,6 +31,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _companyController = TextEditingController(); // Only for Craftsman
 
   bool _isLoading = false;
+  File? _avatarFile;
+  Uint8List? _webImage;
+  String? _avatarUrl;
+  
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void dispose() {
@@ -42,6 +48,56 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     _cityController.dispose();
     _companyController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _webImage = bytes;
+          _avatarFile = File('a_path'); 
+        });
+      } else {
+        setState(() {
+          _avatarFile = File(pickedFile.path);
+        });
+      }
+      _uploadAvatar(pickedFile);
+    }
+  }
+
+  Future<void> _uploadAvatar(XFile file) async {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+    final fileExt = file.name.split('.').last;
+    final fileName = '$userId.${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+    final filePath = fileName; 
+    
+    setState(() => _isLoading = true);
+    try {
+      final bytes = await file.readAsBytes();
+      await Supabase.instance.client.storage.from('avatars').uploadBinary(
+            filePath,
+            bytes,
+            fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
+          );
+      final imageUrl = Supabase.instance.client.storage.from('avatars').getPublicUrl(filePath);
+      
+      // Update local and remote
+      setState(() => _avatarUrl = imageUrl);
+
+      await Supabase.instance.client.from('profiles').update({
+        'avatar_url': imageUrl,
+      }).eq('id', userId);
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload Fehler: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _submitProfile() async {
@@ -62,6 +118,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         'city': _cityController.text.trim(),
         'updated_at': DateTime.now().toIso8601String(),
       };
+      
+      if (_avatarUrl != null) {
+        updates['avatar_url'] = _avatarUrl;
+      }
 
       updates['company_name'] = _companyController.text.trim();
 
@@ -121,6 +181,42 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xl),
+
+              // Avatar Picker
+              Center(
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 50,
+                        backgroundColor: AppColors.bgElevated,
+                        backgroundImage: _webImage != null
+                            ? MemoryImage(_webImage!)
+                            : _avatarFile != null
+                                ? FileImage(_avatarFile!)
+                                : (_avatarUrl != null ? NetworkImage(_avatarUrl!) : null) as ImageProvider?,
+                        child: (_webImage == null && _avatarFile == null && _avatarUrl == null)
+                            ? const Icon(Icons.person, size: 50, color: AppColors.textSecondary)
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppColors.accentPrimary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
 
               // Name
               Row(
