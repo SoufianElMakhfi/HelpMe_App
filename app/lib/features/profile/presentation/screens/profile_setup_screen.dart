@@ -233,8 +233,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Widget build(BuildContext context) {
     // 1. Determine Colors & Assets based on Role
     final isCustomer = widget.role == 'customer';
-    final accentColor = isCustomer ? AppColors.accentPrimary : const Color(0xFF00E676); // Neon Green updated
-    final backgroundColor = accentColor; 
+    final accentColor = isCustomer ? AppColors.accentPrimary : AppColors.accentSecondary; 
+    final backgroundColor = accentColor; // Use the resolved accentColor 
     final imagePath = isCustomer 
         ? 'assets/images/customer_character.png' 
         : 'assets/images/craftsman_character.png';
@@ -252,7 +252,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
 
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: backgroundColor, 
       body: Stack(
         children: [
           // A. 3D Character Image
