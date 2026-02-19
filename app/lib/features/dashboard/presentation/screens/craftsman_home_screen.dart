@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../onboarding/presentation/screens/role_selection_screen.dart';
-import 'package:helpme/core/theme/app_spacing.dart';
-import 'package:helpme/core/theme/app_typography.dart';
-import 'package:helpme/features/jobs/presentation/screens/job_detail_screen.dart';
-import 'package:helpme/features/chat/presentation/screens/chat_screen.dart'; 
-import 'package:helpme/features/profile/presentation/screens/profile_setup_screen.dart'; // Import Profile
+import '../../../jobs/presentation/screens/job_detail_screen.dart'; // We need to build/refactor this too
+import '../../../profile/presentation/screens/profile_setup_screen.dart'; 
 
 class CraftsmanHomeScreen extends StatefulWidget {
   const CraftsmanHomeScreen({super.key});
@@ -16,303 +14,334 @@ class CraftsmanHomeScreen extends StatefulWidget {
 }
 
 class _CraftsmanHomeScreenState extends State<CraftsmanHomeScreen> {
-  int _currentIndex = 0;
+  final _userId = Supabase.instance.client.auth.currentUser?.id;
+  String _userName = 'Meister';
+  String? _avatarUrl;
+  int _selectedTab = 0; // 0 = Marketplace (Open Jobs), 1 = My Jobs
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    if (_userId == null) return;
+    try {
+      final data = await Supabase.instance.client
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('id', _userId!)
+          .maybeSingle();
+      
+      if (data != null && mounted) {
+        setState(() {
+          final fullName = data['full_name'] as String?;
+          if (fullName != null && fullName.isNotEmpty) {
+             _userName = fullName.split(' ').first; 
+          }
+          _avatarUrl = data['avatar_url'] as String?;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading profile: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
-      appBar: AppBar(
-        title: Text(_currentIndex == 0 ? 'Jobs finden 🔍' : 'Meine Aufträge ✅'),
-        backgroundColor: AppColors.bgPrimary,
-        foregroundColor: AppColors.textPrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {
-               Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileSetupScreen(role: 'craftsman')), // Pass role
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
-              if (mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
-                  (route) => false,
-                );
-              }
-            },
-          ),
-        ],
-      ),
-      body: _currentIndex == 0 ? _buildJobFeed() : _buildMyJobs(),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: AppColors.bgSurface,
-        selectedItemColor: AppColors.accentPrimary,
-        unselectedItemColor: AppColors.textSecondary,
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Jobs finden',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.check_circle_outline),
-            label: 'Meine Aufträge',
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- TAB 1: FEED ---
-  Widget _buildJobFeed() {
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: Supabase.instance.client
-          .from('jobs')
-          .stream(primaryKey: ['id']).order('created_at', ascending: false),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final jobs = snapshot.data!;
-        
-        if (jobs.isEmpty) {
-          return const Center(
-            child: Text(
-              'Aktuell keine Jobs verfügbar.',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-          );
-        }
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          itemCount: jobs.length,
-          separatorBuilder: (ctx, i) => const SizedBox(height: AppSpacing.md),
-          itemBuilder: (context, index) {
-            final job = jobs[index];
-            return _buildJobCard(context, job);
-          },
-        );
-      },
-    );
-  }
-
-  // --- TAB 2: MY JOBS ---
-  Widget _buildMyJobs() {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-    
-    // We fetch 'job_applications' joined with 'jobs'
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: Supabase.instance.client
-          .from('job_applications')
-          .select('*, jobs(*)')
-          .eq('craftsman_id', userId)
-          .order('created_at', ascending: false),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-           return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Fehler: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
-        }
-        
-        final applications = snapshot.data ?? [];
-
-        if (applications.isEmpty) {
-          return const Center(
-            child: Text(
-              'Du hast noch keine Hilfe angeboten.',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-          );
-        }
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          itemCount: applications.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-          itemBuilder: (context, index) {
-            final app = applications[index];
-            final job = app['jobs']; // Joined job data
-            final status = app['status'];
-
-            if (job == null) return const SizedBox.shrink();
-
-            return Container(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                color: AppColors.bgSurface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: status == 'accepted' ? AppColors.success : AppColors.bgElevated,
-                  width: status == 'accepted' ? 2 : 1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 1. Header with Greeting & Avatar
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        status == 'accepted' ? 'Im Kontakt 💬' : 'Wartet auf Antwort ⏳',
-                        style: TextStyle(
-                          color: status == 'accepted' ? AppColors.accentPrimary : AppColors.textSecondary,
-
+                        'Moin, $_userName 👋',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                          fontFamily: 'Outfit',
                         ),
                       ),
                       Text(
-                        '${app['price_offer'] ?? job['budget']} €',
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
+                        _selectedTab == 0 ? 'Finde neue Aufträge' : 'Deine Baustellen',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 14,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    job['title'] ?? 'Unbekannt',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => ProfileSetupScreen(role: 'craftsman')),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Deine Nachricht: "${app['message']}"',
-                    style: const TextStyle(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (status == 'accepted') ...[
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          if (job['customer_id'] != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChatScreen(
-                                  otherUserId: job['customer_id'],
-                                  otherUserName: 'Kunde', // Could fetch name
-                                  applicationId: app['id'],
-                                ),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Fehler: Keine Kunden-ID gefunden! 🛑')),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.chat_bubble_outline),
-                        label: const Text('Kunden kontaktieren'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.success,
-                          foregroundColor: Colors.white,
-                        ),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.bgSurface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.accentSecondary.withValues(alpha: 0.3), width: 2),
+                        image: _avatarUrl != null 
+                            ? DecorationImage(image: NetworkImage(_avatarUrl!), fit: BoxFit.cover) 
+                            : null,
                       ),
+                      child: _avatarUrl == null 
+                          ? const Icon(Icons.person, color: Colors.white) 
+                          : null,
                     ),
-                  ],
+                  ),
                 ],
               ),
-            );
+            ),
+
+            // 2. Custom Tab Switcher
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppColors.bgElevated,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildTabButton('Marktplatz', 0),
+                  ),
+                  Expanded(
+                    child: _buildTabButton('Meine Jobs', 1),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+
+            // 3. Job List (Feed)
+            Expanded(
+              child: _selectedTab == 0 ? _buildMarketplaceFeed() : _buildMyJobsFeed(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabButton(String label, int index) {
+    bool isSelected = _selectedTab == index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTab = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accentSecondary : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.black : Colors.white.withValues(alpha: 0.5),
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMarketplaceFeed() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: Supabase.instance.client
+          .from('jobs')
+          .select('*')
+          .eq('status', 'open') // Only show OPEN jobs
+          .order('created_at', ascending: false)
+          .asStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+           return const Center(child: CircularProgressIndicator(color: AppColors.accentSecondary));
+        }
+        if (snapshot.hasError) {
+           return Center(child: Text('Fehler: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
+        }
+        
+        final jobs = snapshot.data ?? [];
+        
+        if (jobs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.search_off, size: 64, color: Colors.white.withValues(alpha: 0.2)),
+                const SizedBox(height: 16),
+                Text(
+                  'Keine offenen Aufträge gefunden.',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          itemCount: jobs.length,
+          separatorBuilder: (ctx, i) => const SizedBox(height: 16),
+          itemBuilder: (context, index) {
+            return _buildJobCard(jobs[index]);
           },
         );
       },
     );
   }
 
-  Widget _buildJobCard(BuildContext context, Map<String, dynamic> job) {
+  Widget _buildMyJobsFeed() {
+    // Placeholder for "My Jobs" logic (requires assignment logic)
+    // For now, let's show jobs where craftsman_id matches (if we had that column)
+    return Center(
+      child: Text(
+        'Du hast noch keine Aufträge angenommen.',
+        style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+      ),
+    );
+  }
+
+  Widget _buildJobCard(Map<String, dynamic> job) {
+    // Extract Data
     final title = job['title'] ?? 'Unbekannt';
-    final category = job['category'] ?? 'Sonstiges';
-    final location = job['location'] ?? 'Kein Ort';
-    final budget = job['budget'] ?? 'VB';
-    
-    IconData catIcon = Icons.work;
-    if (category == 'Maler') catIcon = Icons.format_paint;
-    if (category == 'Elektrik') catIcon = Icons.bolt;
-    if (category == 'Garten') catIcon = Icons.yard;
-    if (category == 'Sanitär') catIcon = Icons.water_drop;
+    final category = job['category'] ?? 'Allgemein';
+    final city = job['city'] ?? 'Unbekannt';
+    // final status = job['status'];
+    final urgency = job['urgency'] ?? 'normal';
+    final images = job['images'] as List<dynamic>?;
+    final hasImage = images != null && images.isNotEmpty;
+
+    // Urgency Color/Icon
+    Color urgencyColor = Colors.orangeAccent;
+    String urgencyText = 'Wichtig';
+    if (urgency == 'emergency') {
+      urgencyColor = Colors.redAccent;
+      urgencyText = 'Notfall';
+    } else if (urgency == 'flexible') {
+      urgencyColor = Colors.greenAccent;
+      urgencyText = 'Flexibel';
+    }
 
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => JobDetailScreen(job: job),
-          ),
-        );
+        // Navigate to Job Detail
+        Navigator.push(context, MaterialPageRoute(builder: (_) => JobDetailScreen(job: job)));
       },
       child: Container(
+        height: 140, // Fixed height for consistent look
         decoration: BoxDecoration(
-          color: AppColors.bgSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.bgElevated),
+          color: AppColors.bgElevated,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Chip(
-                    label: Text(category),
-                    avatar: Icon(catIcon, size: 16, color: AppColors.textInverse),
-                    backgroundColor: AppColors.accentPrimary,
-                    labelStyle: const TextStyle(color: AppColors.textInverse, fontWeight: FontWeight.bold),
-                    padding: EdgeInsets.zero,
-                  ),
-                  Text(
-                    budget,
-                    style: const TextStyle(
-                      color: AppColors.success,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                ],
+        child: Row(
+          children: [
+            // Left: Image or Icon
+            Container(
+              width: 120,
+              decoration: BoxDecoration(
+                color: AppColors.bgSurface,
+                borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)),
+                image: hasImage ? DecorationImage(
+                  image: NetworkImage(images[0]),
+                  fit: BoxFit.cover,
+                ) : null,
               ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              child: !hasImage 
+                  ? Center(child: Icon(_getCategoryIcon(category), color: Colors.white24, size: 40)) 
+                  : null,
+            ),
+            
+            // Right: Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Badge (Urgency)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: urgencyColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: urgencyColor.withValues(alpha: 0.5), width: 0.5),
+                      ),
+                      child: Text(
+                        urgencyText.toUpperCase(),
+                        style: TextStyle(color: urgencyColor, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    
+                    // Title
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    
+                    // Location & Category
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_outlined, size: 14, color: Colors.white54),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            city,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                children: [
-                   const Icon(Icons.location_on, size: 16, color: AppColors.textSecondary),
-                   const SizedBox(width: 4),
-                   Text(
-                     location,
-                     style: const TextStyle(color: AppColors.textSecondary),
-                   ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  IconData _getCategoryIcon(String category) {
+    // Simple mapper
+    switch (category) {
+      case 'Sanitär': return Icons.water_drop_outlined;
+      case 'Elektro': return Icons.lightbulb_outline;
+      case 'Möbel': return Icons.chair_outlined;
+      case 'Garten': return Icons.grass_outlined;
+      case 'Maler': return Icons.format_paint_outlined;
+      default: return Icons.build_circle_outlined;
+    }
   }
 }

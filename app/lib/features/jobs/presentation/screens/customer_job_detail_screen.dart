@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
-import 'package:helpme/core/theme/app_spacing.dart'; // Fixed import
-import 'package:helpme/features/chat/presentation/screens/chat_screen.dart'; // Import Chat
+import '../../../../core/theme/app_spacing.dart';
+import '../../../chat/presentation/screens/chat_screen.dart'; // Import Chat
 
 class CustomerJobDetailScreen extends StatefulWidget {
   final Map<String, dynamic> job;
@@ -14,39 +14,46 @@ class CustomerJobDetailScreen extends StatefulWidget {
 }
 
 class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
-  bool _isLoading = false;
+  // State
+  List<Map<String, dynamic>> _applications = [];
+  bool _isLoadingApps = true;
 
-  Future<void> _acceptOffer(String applicationId) async {
-    setState(() => _isLoading = true);
+  @override
+  void initState() {
+    super.initState();
+    _loadApplications();
+  }
+
+  Future<void> _loadApplications() async {
+    final jobId = widget.job['id'];
     try {
-      await Supabase.instance.client
+      // Fetch applications joined with profiles to get craftsman name/avatar
+      final response = await Supabase.instance.client
           .from('job_applications')
-          .update({'status': 'accepted'})
-          .eq('id', applicationId);
+          .select('*, profiles:craftsman_id(*)') 
+          .eq('job_id', jobId)
+          .order('created_at', ascending: false);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kontakt hergestellt! 🎉')),
-        );
+        setState(() {
+          _applications = List<Map<String, dynamic>>.from(response);
+          _isLoadingApps = false;
+        });
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fehler: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint('Error loading applications: $e');
+      if (mounted) setState(() => _isLoadingApps = false);
     }
   }
 
-  void _startChat(String craftsmanId, String applicationId) {
+  void _startChat(String craftsmanId, String craftsmanName, String applicationId) {
+    // Navigate to Chat
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          otherUserId: craftsmanId, 
-          otherUserName: 'Handwerker', 
+          otherUserId: craftsmanId,
+          otherUserName: craftsmanName,
           applicationId: applicationId,
         ),
       ),
@@ -57,109 +64,152 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
   Widget build(BuildContext context) {
     final title = widget.job['title'] ?? 'Unbekannt';
     final description = widget.job['description'] ?? 'Keine Beschreibung';
-    final budget = widget.job['budget'] ?? 'VB';
-    final jobId = widget.job['id'];
+    final images = widget.job['images'] as List<dynamic>?;
+    final status = widget.job['status'] ?? 'open';
+    
+    // Status Logic
+    Color statusColor = Colors.orangeAccent;
+    String statusText = 'Offen';
+    if (status == 'in_progress') {
+       statusColor = Colors.blueAccent;
+       statusText = 'In Arbeit';
+    } else if (status == 'completed') {
+       statusColor = Colors.greenAccent;
+       statusText = 'Erledigt';
+    }
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
-      appBar: AppBar(
-        title: const Text('Bewerbungen'),
-        backgroundColor: AppColors.bgPrimary,
-        foregroundColor: AppColors.textPrimary,
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Stack(
         children: [
-          // Job Header (Compact)
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            color: AppColors.bgSurface,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    const Icon(Icons.euro, color: AppColors.success, size: 18),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Budget: $budget €',
-                      style: const TextStyle(
-                        color: AppColors.success,
-                        fontWeight: FontWeight.bold,
+          // 1. Header Image
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 250,
+            child: images != null && images.isNotEmpty
+                ? Image.network(images[0] as String, fit: BoxFit.cover)
+                : Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppColors.accentPrimary.withOpacity(0.2), AppColors.bgPrimary],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                    child: Center(child: Icon(Icons.handyman_outlined, size: 80, color: Colors.white.withOpacity(0.1))),
+                  ),
           ),
           
-          const SizedBox(height: AppSpacing.lg),
-          
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: Text(
-              'Eingehende Angebote',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
+          // Overlay Gradient
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 250,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.black54, Colors.transparent, AppColors.bgPrimary],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.0, 0.5, 1.0],
+                ),
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
 
-          // Applications List
-          Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: Supabase.instance.client
-                  .from('job_applications')
-                  .stream(primaryKey: ['id'])
-                  .eq('job_id', jobId)
-                  .order('created_at', ascending: false),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(child: Text('Fehler: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final applications = snapshot.data!;
+          // Back Button
+          Positioned(
+            top: 40,
+            left: 20,
+            child: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
 
-                if (applications.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'Noch keine Bewerbungen.',
-                      style: TextStyle(color: AppColors.textSecondary),
+          // Content
+          Positioned(
+            top: 200,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              decoration: const BoxDecoration(
+                color: AppColors.bgPrimary,
+                borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: statusColor),
                     ),
-                  );
-                }
+                    child: Text(statusText.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Title
+                  Text(
+                    title,
+                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    description,
+                    style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Applications Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Bewerbungen', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                      if (!_isLoadingApps)
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(color: AppColors.accentPrimary, shape: BoxShape.circle),
+                          child: Text('${_applications.length}', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                  itemCount: applications.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-                  itemBuilder: (context, index) {
-                    final app = applications[index];
-                    return _buildApplicationCard(app);
-                  },
-                );
-              },
+                  // List of Applicants
+                  Expanded(
+                    child: _isLoadingApps 
+                        ? const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary))
+                        : _applications.isEmpty 
+                            ? _buildEmptyState()
+                            : ListView.separated(
+                                itemCount: _applications.length,
+                                separatorBuilder: (ctx, i) => const SizedBox(height: 16),
+                                itemBuilder: (context, index) {
+                                  return _buildApplicationCard(_applications[index]);
+                                },
+                              ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -167,167 +217,126 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
     );
   }
 
-  Widget _buildApplicationCard(Map<String, dynamic> application) {
-    final craftsmanId = application['craftsman_id'];
-    final message = application['message'] ?? '';
-    final priceOffer = application['price_offer'];
-    final status = application['status'] ?? 'pending';
-
-    return FutureBuilder<Map<String, dynamic>>(
-      future: Supabase.instance.client
-          .from('profiles')
-          .select()
-          .eq('id', craftsmanId)
-          .single(),
-      builder: (context, snapshot) {
-        final profile = snapshot.data;
-        final name = profile != null 
-            ? '${profile['first_name'] ?? ''} ${profile['last_name'] ?? ''}'.trim()
-            : 'Lädt...';
-        final company = profile?['company_name'];
-        final avatarUrl = profile?['avatar_url'];
-
-        return Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: AppColors.bgSurface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: status == 'accepted' 
-                  ? AppColors.accentPrimary 
-                  : AppColors.bgElevated,
-              width: status == 'accepted' ? 2 : 1,
-            ),
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.person_search_outlined, size: 60, color: Colors.white.withOpacity(0.2)),
+          const SizedBox(height: 16),
+          Text(
+            'Noch keine Bewerbungen.',
+            style: TextStyle(color: Colors.white.withOpacity(0.5)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header: Avatar, Name & Price
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: AppColors.bgElevated,
-                          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                          child: avatarUrl == null ? const Icon(Icons.person, color: AppColors.textSecondary) : null,
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                company != null && company.isNotEmpty ? company : name,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              if (company != null && company.isNotEmpty)
-                                Text(
-                                  name,
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (priceOffer != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgElevated,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '$priceOffer €',
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              
-              // Message
-              Text(
-                '"$message"',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Wir benachrichtigen dich, sobald sich ein Handwerker meldet.',
+            style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 
-              // Actions
-              if (status == 'accepted')
-                Column(
+  Widget _buildApplicationCard(Map<String, dynamic> app) {
+    final craftsman = app['profiles'] ?? {}; // Joined data
+    final name = craftsman['full_name'] ?? 'Handwerker';
+    final avatarUrl = craftsman['avatar_url']; // Potential URL
+    final message = app['message'] ?? 'Keine Nachricht';
+    final price = app['price_offer'];
+    final craftsmanId = app['craftsman_id'];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgElevated,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Avatar + Name + Price
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                   color: AppColors.bgSurface,
+                   shape: BoxShape.circle,
+                   image: avatarUrl != null ? DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover) : null,
+                ),
+                child: avatarUrl == null ? const Icon(Icons.person, color: Colors.white70) : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentPrimary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'Im Kontakt 💬',
-                          style: TextStyle(
-                            color: AppColors.accentPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        // ERROR: _startChat expects 2 args now. 'application' variable is available in scope?
-                        // Yes, _buildApplicationCard(Map<String, dynamic> application)
-                        onPressed: () => _startChat(craftsmanId, application['id']), 
-                        icon: const Icon(Icons.chat_bubble_outline),
-                        label: const Text('Zum Chat'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textPrimary,
-                          side: const BorderSide(color: AppColors.textSecondary),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                      ),
+                    Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    Row(
+                       children: const [
+                         Icon(Icons.star, size: 12, color: AppColors.accentPrimary),
+                         SizedBox(width: 4),
+                         Text('Neu', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                       ],
                     ),
                   ],
-                )
-              else
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : () => _acceptOffer(application['id']),
-                    icon: const Icon(Icons.chat_bubble_outline),
-                    label: const Text('Kontakt aufnehmen'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accentPrimary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
+                ),
+              ),
+              if (price != null)
+                Text(
+                  '$price €',
+                  style: const TextStyle(color: AppColors.accentPrimary, fontWeight: FontWeight.bold, fontSize: 18),
                 ),
             ],
           ),
-        );
-      },
+          
+          const SizedBox(height: 12),
+          
+          // Message
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.bgSurface.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '"$message"',
+              style: TextStyle(color: Colors.white.withOpacity(0.8), fontStyle: FontStyle.italic),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Actions
+          Row(
+            children: [
+               Expanded(
+                 child: OutlinedButton(
+                   onPressed: () {
+                      // Reject logic (optional)
+                   },
+                   style: OutlinedButton.styleFrom(foregroundColor: Colors.white54, side: BorderSide(color: Colors.white12)),
+                   child: const Text('Ablehnen'),
+                 ),
+               ),
+               const SizedBox(width: 12),
+               Expanded(
+                 child: ElevatedButton(
+                   onPressed: () => _startChat(craftsmanId, name, app['id']),
+                   style: ElevatedButton.styleFrom(
+                     backgroundColor: AppColors.accentPrimary,
+                     foregroundColor: Colors.black,
+                   ),
+                   child: const Text('Chatten'),
+                 ),
+               ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
