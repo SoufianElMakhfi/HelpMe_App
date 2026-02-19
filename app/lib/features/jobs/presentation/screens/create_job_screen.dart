@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,7 +7,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 
 class CreateJobScreen extends StatefulWidget {
-  const CreateJobScreen({super.key});
+  final String? initialCategory; // Optional preset category from dashboard
+
+  const CreateJobScreen({super.key, this.initialCategory});
 
   @override
   State<CreateJobScreen> createState() => _CreateJobScreenState();
@@ -20,12 +21,16 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
   // Controllers
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _budgetController = TextEditingController();
-  final _locationController = TextEditingController();
   
+  // Address Controllers
+  final _streetController = TextEditingController();
+  final _houseNumberController = TextEditingController();
+  final _zipController = TextEditingController();
+  final _cityController = TextEditingController();
+
   // State
   String _selectedCategory = 'Sonstiges';
-  DateTime? _selectedDate;
+  String _urgency = 'normal'; // 'emergency', 'normal', 'flexible'
   bool _isLoading = false;
   
   // Image Upload
@@ -44,11 +49,42 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.initialCategory != null) {
+      _selectedCategory = widget.initialCategory!;
+    }
+    _loadUserAddress(); // Pre-fill address if available
+  }
+
+  Future<void> _loadUserAddress() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+    
+    final data = await Supabase.instance.client
+        .from('profiles')
+        .select('street, house_number, zip_code, city')
+        .eq('id', userId)
+        .maybeSingle();
+
+    if (data != null && mounted) {
+      setState(() {
+        _streetController.text = data['street'] ?? '';
+        _houseNumberController.text = data['house_number'] ?? '';
+        _zipController.text = data['zip_code'] ?? '';
+        _cityController.text = data['city'] ?? '';
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _budgetController.dispose();
-    _locationController.dispose();
+    _streetController.dispose();
+    _houseNumberController.dispose();
+    _zipController.dispose();
+    _cityController.dispose();
     super.dispose();
   }
 
@@ -76,46 +112,15 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
     });
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppColors.accentPrimary,
-              onPrimary: Colors.black,
-              surface: Color(0xFF1E2430),
-              onSurface: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-    }
-  }
-
   Future<void> _submitJob() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bitte wähle ein Datum aus.')),
-      );
-      return;
-    }
 
     setState(() => _isLoading = true);
 
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
       
-      // 1. Upload Images (if any)
+      // 1. Upload Images
       List<String> imageUrls = [];
       for (var image in _selectedImages) {
         final fileExt = image.name.split('.').last;
@@ -138,16 +143,19 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
         'category': _selectedCategory,
-        'budget': _budgetController.text.trim().isEmpty ? 'VB' : _budgetController.text.trim(),
-        'location': _locationController.text.trim(),
-        'scheduled_date': _selectedDate!.toIso8601String(),
+        'urgency': _urgency, // 'emergency', 'normal', 'flexible'
+        'street': _streetController.text.trim(),
+        'house_number': _houseNumberController.text.trim(),
+        'zip_code': _zipController.text.trim(),
+        'city': _cityController.text.trim(),
         'status': 'open',
-        'images': imageUrls, // Array of URLs
+        'images': imageUrls, 
+        // No budget, No date (negotiated in chat)
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Auftrag erfolgreich erstellt! 🎉')),
+          const SnackBar(content: Text('Auftrag erfolgreich erstellt! 🚀')),
         );
         Navigator.pop(context);
       }
@@ -269,7 +277,7 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
                       
                       const SizedBox(height: 32),
                       
-                      // Images
+                      // Images Section
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -351,37 +359,39 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
 
                       const SizedBox(height: 32),
 
-                      // Location & Date
-                      _buildTextField('Ort / Adresse', _locationController, icon: Icons.location_on_outlined),
-                      const SizedBox(height: 16),
-                      InkWell(
-                        onTap: _pickDate,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF252525),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.transparent),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.calendar_today_outlined, color: Colors.white.withValues(alpha: 0.5), size: 20),
-                              const SizedBox(width: 12),
-                              Text(
-                                _selectedDate == null 
-                                  ? 'Wunschtermin wählen' 
-                                  : '${_selectedDate!.day}.${_selectedDate!.month}.${_selectedDate!.year}',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                              ),
-                              const Spacer(),
-                              const Icon(Icons.arrow_drop_down, color: Colors.white54),
-                            ],
-                          ),
-                        ),
+                      // Urgency (Traffic Light)
+                      const Text('Dringlichkeit', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: _buildUrgencyOption('Notfall', 'emergency', Colors.redAccent, Icons.warning_amber_rounded)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildUrgencyOption('Wichtig', 'normal', Colors.orangeAccent, Icons.calendar_today)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildUrgencyOption('Flexibel', 'flexible', Colors.greenAccent, Icons.weekend_outlined)),
+                        ],
                       ),
-                      
-                      const SizedBox(height: 16),
-                      _buildTextField('Budget (Optional)', _budgetController, icon: Icons.euro, required: false),
+
+                      const SizedBox(height: 32),
+
+                      // Address Fields (Split)
+                      const Text('Einsatzort', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(flex: 3, child: _buildTextField('Straße', _streetController, icon: Icons.home_outlined)),
+                          const SizedBox(width: 12),
+                          Expanded(flex: 1, child: _buildTextField('Nr.', _houseNumberController)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(flex: 1, child: _buildTextField('PLZ', _zipController, isNumber: true)),
+                          const SizedBox(width: 12),
+                          Expanded(flex: 2, child: _buildTextField('Stadt', _cityController, icon: Icons.location_city)),
+                        ],
+                      ),
 
                       const SizedBox(height: 48),
 
@@ -415,10 +425,44 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {int maxLines = 1, IconData? icon, bool required = true}) {
+  Widget _buildUrgencyOption(String label, String value, Color color, IconData icon) {
+    bool isSelected = _urgency == value;
+    return GestureDetector(
+      onTap: () => setState(() => _urgency = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.2) : AppColors.bgElevated,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.white12,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: isSelected ? color : Colors.white54, size: 24),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? color : Colors.white54,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller, {int maxLines = 1, IconData? icon, bool required = true, bool isNumber = false}) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
       validator: required ? (value) {
         if (value == null || value.isEmpty) return 'Pflichtfeld';
