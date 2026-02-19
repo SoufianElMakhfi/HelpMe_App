@@ -29,6 +29,23 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _fetchOtherUserProfile();
+    _markMessagesAsRead();
+  }
+
+  Future<void> _markMessagesAsRead() async {
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    if (myId == null || widget.applicationId == null) return;
+
+    try {
+      await Supabase.instance.client
+          .from('messages')
+          .update({'is_read': true})
+          .eq('application_id', widget.applicationId!)
+          .eq('receiver_id', myId) // Only mark messages received BY ME as read
+          .eq('is_read', false);   // Only unread ones
+    } catch (e) {
+      debugPrint('Error marking messages as read: $e');
+    }
   }
 
   Future<void> _fetchOtherUserProfile() async {

@@ -258,14 +258,34 @@ class _CraftsmanHomeScreenState extends State<CraftsmanHomeScreen> {
             if (job == null) return const SizedBox.shrink(); // Should not happen
 
             // We use the same card design but maybe add a status badge from the application
-            return _buildJobCard(job, applicationStatus: application['status']);
+            return _buildJobCard(
+              job, 
+              applicationStatus: application['status'],
+              applicationId: application['id'], // Pass ID for unread check
+            );
           },
         );
       },
     );
   }
 
-  Widget _buildJobCard(Map<String, dynamic> job, {String? applicationStatus}) {
+  Future<bool> _hasUnreadMessages(String applicationId) async {
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    if (myId == null) return false;
+    
+    final response = await Supabase.instance.client
+        .from('messages')
+        .select('id') // We only need to check existence
+        .eq('application_id', applicationId)
+        .eq('receiver_id', myId)
+        .eq('is_read', false)
+        .limit(1) // Just one is enough
+        .maybeSingle();
+        
+    return response != null;
+  }
+
+  Widget _buildJobCard(Map<String, dynamic> job, {String? applicationStatus, String? applicationId}) {
     // Extract Data
     final title = job['title'] ?? 'Unbekannt';
     final category = job['category'] ?? 'Allgemein';
@@ -315,77 +335,105 @@ class _CraftsmanHomeScreenState extends State<CraftsmanHomeScreen> {
             BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),
-        child: Row(
+        child: Stack(
           children: [
-            // Left: Image or Icon
-            Container(
-              width: 120,
-              decoration: BoxDecoration(
-                color: AppColors.bgSurface,
-                borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)),
-                image: hasImage ? DecorationImage(
-                  image: NetworkImage(images[0]),
-                  fit: BoxFit.cover,
-                ) : null,
-              ),
-              child: !hasImage 
-                  ? Center(child: Icon(_getCategoryIcon(category), color: Colors.white24, size: 40)) 
-                  : null,
-            ),
-            
-            // Right: Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Badge (Urgency)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: statusColor.withValues(alpha: 0.5), width: 0.5),
-                      ),
-                      child: Text(
-                        statusText.toUpperCase(),
-                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    
-                    // Title
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    
-                    // Location & Category
-                    Row(
+            Row(
+              children: [
+                // Left: Image or Icon
+                Container(
+                  width: 120,
+                  decoration: BoxDecoration(
+                    color: AppColors.bgSurface,
+                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)),
+                    image: hasImage ? DecorationImage(
+                      image: NetworkImage(images[0]),
+                      fit: BoxFit.cover,
+                    ) : null,
+                  ),
+                  child: !hasImage 
+                      ? Center(child: Icon(_getCategoryIcon(category), color: Colors.white24, size: 40)) 
+                      : null,
+                ),
+                
+                // Right: Content
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(Icons.location_on_outlined, size: 14, color: Colors.white54),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            city,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        // Badge (Urgency)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.5), width: 0.5),
                           ),
+                          child: Text(
+                            statusText.toUpperCase(),
+                            style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        
+                        // Title
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        
+                        // Location & Category
+                        Row(
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 14, color: Colors.white54),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                city,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
+
+            // Unread Indicator (Red Dot)
+            if (applicationId != null)
+              FutureBuilder<bool>(
+                future: _hasUnreadMessages(applicationId),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data == true) {
+                    return Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.bgElevated, width: 2),
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
           ],
         ),
       ),

@@ -238,12 +238,29 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
     );
   }
 
+  Future<bool> _hasUnreadMessages(String applicationId) async {
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    if (myId == null) return false;
+    
+    final response = await Supabase.instance.client
+        .from('messages')
+        .select('id')
+        .eq('application_id', applicationId)
+        .eq('receiver_id', myId)
+        .eq('is_read', false)
+        .limit(1)
+        .maybeSingle();
+        
+    return response != null;
+  }
+
   Widget _buildApplicationCard(Map<String, dynamic> app) {
     final craftsman = app['profiles'] ?? {}; // Joined data
     final name = craftsman['full_name'] ?? 'Handwerker';
     final avatarUrl = craftsman['avatar_url']; // Potential URL
     final message = app['message'] ?? 'Keine Nachricht';
     final price = app['price_offer'];
+    final applicationId = app['id']; // Needed for unread check
     final craftsmanId = app['craftsman_id'];
 
     return Container(
@@ -293,6 +310,30 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
             ],
           ),
           
+          // Unread Indicator (if any)
+          FutureBuilder<bool>(
+            future: _hasUnreadMessages(applicationId),
+            builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data == true) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('Neue Nachricht 💬', style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+
           const SizedBox(height: 12),
           
           // Message
