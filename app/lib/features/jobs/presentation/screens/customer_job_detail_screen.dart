@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../chat/presentation/screens/chat_screen.dart'; // Import Chat
+import '../../../profile/presentation/screens/public_profile_screen.dart'; // Import Profile
 
 class CustomerJobDetailScreen extends StatefulWidget {
   final Map<String, dynamic> job;
@@ -275,41 +276,52 @@ class _CustomerJobDetailScreenState extends State<CustomerJobDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header: Avatar + Name + Price
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                   color: AppColors.bgSurface,
-                   shape: BoxShape.circle,
-                   image: avatarUrl != null ? DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover) : null,
+          GestureDetector(
+            onTap: () {
+              if (craftsmanId != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => PublicProfileScreen(userId: craftsmanId)),
+                );
+              }
+            },
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                     color: AppColors.bgSurface,
+                     shape: BoxShape.circle,
+                     image: avatarUrl != null ? DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover) : null,
+                  ),
+                  child: avatarUrl == null ? const Icon(Icons.person, color: Colors.white70) : null,
                 ),
-                child: avatarUrl == null ? const Icon(Icons.person, color: Colors.white70) : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                    Row(
-                       children: const [
-                         Icon(Icons.star, size: 12, color: AppColors.accentPrimary),
-                         SizedBox(width: 4),
-                         Text('Neu', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                       ],
-                    ),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      Row(
+                         children: const [
+                           Icon(Icons.star, size: 12, color: AppColors.accentPrimary),
+                           SizedBox(width: 4),
+                           Text('Profil ansehen', style: TextStyle(color: AppColors.accentPrimary, fontSize: 12, decoration: TextDecoration.underline)),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               if (price != null)
                 Text(
                   '$price €',
                   style: const TextStyle(color: AppColors.accentPrimary, fontWeight: FontWeight.bold, fontSize: 18),
                 ),
-            ],
+              ],
+            ),
           ),
+
           
           // Unread Indicator (if any)
           FutureBuilder<bool>(
